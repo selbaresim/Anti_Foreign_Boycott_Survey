@@ -1,0 +1,319 @@
+---
+title: "Boycott_China"
+Authoritarianismor: "Mingmin Yang"
+date: "12/2/2019"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+library(quanteda);library(topicmodels);library(dplyr);library(tidyr);
+library(broom);library(readtext);library(jiebaR);
+library(jiebaRD);library(fastDummies);library(ggplot2);library(stm);library(corrplot);library(Hmisc);
+library(sjPlot);library(sjmisc);library(reshape2);library(stargazer)
+knitr::opts_chunk$set(echo = FALSE)
+
+setwd("/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/")
+WJX3 <- readxl::read_xlsx("SurveyData.xlsx") 
+colnames(WJX3)[7] <- 'StudyAbroad'
+colnames(WJX3)[9] <- 'Patriotism'
+colnames(WJX3)[10] <- 'Party'
+colnames(WJX3)[11] <- 'Nationalism'
+colnames(WJX3)[13] <- 'Control'
+WJX3$Tour <- NULL
+colnames(WJX3)[5] <- "Tour"
+WJX3$Boycott <- NULL
+colnames(WJX3)[18] <- "Boycott"
+colnames(WJX3)[7] <- "Authoritarianism"
+
+
+colnames(WJX3)
+WJX3_no_treatment <- readxl::read_xlsx("SurveyDataNoTreatment.xlsx")
+
+colnames(WJX3_no_treatment)[8] <- 'StudyAbroad'
+WJX3_no_treatment$...1 <- NULL
+WJX3_no_treatment$Tour <- NULL
+colnames(WJX3_no_treatment)[5] <- "Tour"
+WJX3_no_treatment$Boycott <- NULL
+colnames(WJX3_no_treatment)[11] <- "Boycott"
+colnames(WJX3_no_treatment)[7] <- "Authoritarianism"
+
+colnames(WJX3_no_treatment)
+
+```
+
+```{r, results='asis'}
+stargazer(as.data.frame(WJX3_no_treatment), type = "latex", digits=1, flip = TRUE)
+stargazer(as.data.frame(WJX3_no_treatment), type = "latex", digits=1)
+```
+#https://stackoverflow.com/questions/43245920/how-to-resize-tables-generated-by-stargazer-in-r-markdown
+
+#Table 2: Heatmap
+```{r}
+cordata <- round(cor(WJX3_no_treatment),2)
+melted_cordata <- melt(cordata) #Melt data to bring the correlation values in two axis
+heatmap1 <- ggplot(data = melted_cordata, aes(x=Var1, y=Var2, fill=value, label= value)) + geom_tile() + scale_fill_gradient2(low = "#132B43",high ="#56B1F7",mid = "white") + geom_text() + theme(axis.text.x=element_text(angle = 90,vjust = 0))# + geom_label()
+heatmap1
+
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/heatmap1.png")
+#plot(heatmap1)
+#dev.off()
+```
+
+#Figure 1: Treatment on Anti-Foreign Boycott
+```{r}
+WJX3_sub1 <- WJX3 %>% group_by(Treatment, as.factor(Boycott)) %>% tally()
+WJX3_sub1 <- WJX3_sub1 %>% rename('Boycott'='as.factor(Boycott)','count'='n')
+figure1 <- ggplot(WJX3_sub1, aes(Treatment, count, fill=Boycott)) + geom_bar(stat="identity", position=position_dodge()) + # scale_fill_grey(start=0.8, end=0.2) + 
+theme_classic() + coord_flip()
+figure1
+
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/figure1.png")
+#plot(figure1)
+#dev.off()
+```
+
+
+```{r}
+#https://rcompanion.org/rcompanion/b_05.html
+#http://www.r-tutor.com/elementary-statistics/inference-about-two-populations/comparison-two-population-proportions
+#dplyr::filter(WJX3, Treatment == 'control' & Boycott == 1)
+#dplyr::filter(WJX3, Treatment == 'Trt1' & Boycott == 1)
+#dplyr::filter(WJX3, Treatment == 'Trt2' & Boycott == 1)
+#dplyr::filter(WJX3, Treatment == 'Trt3' & Boycott == 1)
+#dplyr::filter(WJX3, Treatment == 'Trt4' & Boycott == 1)
+#dplyr::filter(WJX3, Treatment == 'Trt5' & Boycott == 1)
+
+Input =("
+Treatment NoBoycott Boycott
+'Control'   106       131
+'Trt1'      4       223
+'Trt2'      200       27
+'Trt3'      20       206
+'Trt4'      22       207
+'Trt5'      53      181
+")
+
+BoycottDifference = read.table(textConnection(Input),header=TRUE)
+
+BoycottDifference =
+  mutate(BoycottDifference,
+         Sum = NoBoycott + Boycott)
+
+table1_BoycottDifference =
+  mutate(BoycottDifference,
+         Prop = Boycott / Sum,
+         low.ci = apply(BoycottDifference[c("Boycott", "Sum")], 1,
+                        function(y) binom.test(y['Boycott'], y['Sum'])$ conf.int[1]),
+         high.ci = apply(BoycottDifference[c("Boycott", "Sum")], 1,
+                         function(y) binom.test(y['Boycott'], y['Sum'])$ conf.int[2])
+  )
+
+BoycottDifference <- table1_BoycottDifference
+BoycottDifference
+#table1_BoycottDifference
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/table1_BoycottDifference.png")
+#plot(table1_BoycottDifference)
+#dev.off()
+library(gridExtra)
+tableGrob(BoycottDifference)
+#https://stackoverflow.com/questions/30794273/plot-a-data-frame-as-a-table/30794389
+```
+
+```{r}
+### Plot (Bar chart plot)
+library(ggplot2)
+figure2 <- ggplot(BoycottDifference,
+       aes(x=Treatment, y=Prop)) +
+  geom_bar(stat="identity", fill="gray40",
+           colour="black", size=0.5,
+           width=0.7) +
+  geom_errorbar(aes(ymax=high.ci, ymin=low.ci),
+                width=0.2, size=0.5, color="black") +
+  xlab("Treatment") +
+  ylab("Boycott by Treatment") +
+  scale_x_discrete(labels=c("Control", "Trt1",
+                            "Trt2","Trt3","Trt4","Trt5")) +
+  ## ggtitle("Main title") +
+  theme(axis.title=element_text(size=14, color="black",
+                                face="bold", vjust=3)) +
+  theme(axis.text = element_text(size=12, color = "gray25",
+                                 face="bold")) +
+  theme(axis.title.y = element_text(vjust= 1.8)) +
+  theme(axis.title.x = element_text(vjust= -0.5))
+
+figure2
+
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/figure2.png")
+plot(figure2)
+dev.off()
+```
+
+## Model 1
+```{r}
+model1 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party, data=WJX3, family = "binomial")
+
+```
+
+```{r}
+plot_model1 <- plot_model(model1, type = "pred", terms = c("Nationalism ","Trt1"))
+plot_model2 <- plot_model(model1, type = "pred", terms = c("Nationalism ","Trt2"))
+plot_model3 <- plot_model(model1, type = "pred", terms = c("Nationalism ","Trt3"))
+plot_model4 <- plot_model(model1, type = "pred", terms = c("Nationalism ","Trt4"))
+plot_model5 <- plot_model(model1, type = "pred", terms = c("Nationalism ","Trt5"))
+#https://strengejacke.github.io/sjPlot/articles/plot_interactions.html
+#https://cran.r-project.org/web/packages/sjPlot/vignettes/plot_model_estimates.html
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model1.png")
+plot(plot_model1)
+dev.off()
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model2.png")
+plot(plot_model2)
+dev.off()
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model3.png")
+plot(plot_model3)
+dev.off()
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model4.png")
+plot(plot_model4)
+dev.off()
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model5.png")
+plot(plot_model5)
+dev.off()
+
+
+```
+
+```{r}
+WJX3_1 <- WJX3
+WJX3_1$Treatment <- to_factor(WJX3_1$Treatment)
+model1_1 <- glm(Boycott ~ Treatment  + Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party, data=WJX3_1, family = "binomial")
+plot_model6 <- plot_model(model1_1, type = "pred", terms = c("Nationalism ","Treatment"), grid = TRUE)
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model6.png")
+#plot(plot_model6)
+#dev.off()
+```
+#https://cran.r-project.org/web/packages/sjPlot/vignettes/plot_interactions.html
+```
+
+
+# Model 2, Nationalism
+```{r}
+model2 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Trt1*Nationalism + Trt2*Nationalism + Trt3*Nationalism + Trt4*Nationalism +Trt5*Nationalism, data=WJX3, family = "binomial")
+
+model2_1 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Treatment*Nationalism,data=WJX3 , family = "binomial")
+
+plot_model7 <- plot_model(model2, type = "pred", terms = c("Nationalism","Trt1"), grid = TRUE)
+plot_model8 <- plot_model(model2_1, type = "pred", terms = c("Nationalism","Treatment"), grid = TRUE)
+
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model7.png")
+#plot(plot_model1)
+#dev.off()
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model8.png")
+#plot(plot_model2)
+#dev.off()
+```
+
+# Model 3, Patriotism
+```{r}
+model3 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Trt1*Patriotism + Trt2*Patriotism + Trt3*Patriotism + Trt4*Patriotism +Trt5*Patriotism, data=WJX3, family = "binomial")
+
+model3_1 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Treatment*Patriotism,data=WJX3 , family = "binomial")
+
+pplot_model9 <- plot_model(model3, type = "pred", terms = c("Patriotism","Trt1"), grid = TRUE)
+pplot_model10 <- plot_model(model3_1, type = "pred", terms = c("Patriotism","Treatment"), grid = TRUE)
+
+png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model9.png")
+plot(plot_model1)
+dev.off()
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model10.png")
+#plot(plot_model2)
+#dev.off()
+```
+
+# Model 4, interact with Income
+```{r}
+model4 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Trt1*Income + Trt2*Income + Trt3*Income + Trt4*Income +Trt5*Income,data=WJX3 , family = "binomial")
+#summary(model4)
+model4_1 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Treatment*Income,data=WJX3 , family = "binomial")
+
+plot_model10 <- plot_model(model4_1, type = "pred", terms = c("Income","Trt1"), grid = TRUE)
+
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model10.png")
+#plot(plot_model10)
+#dev.off()
+```
+
+# Model 5, interact with Age
+```{r}
+model5 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Trt1*Age + Trt2*Age + Trt3*Age + Trt4*Age +Trt5*Age,data=WJX3 , family = "binomial")
+
+model5_1 <- glm(Boycott ~ Trt1 + Trt2 + Trt3 + Trt4 + Trt5 + Nationalism + Patriotism + Authoritarianism + Tour + StudyAbroad + Age + Education + Gender + Race + Income + Party + Treatment*Age,data=WJX3 , family = "binomial")
+
+plot_model(model5, type = "pred", terms = c("Age","Trt1"), grid = TRUE)
+
+plot_model11 <- plot_model(model5_1, type = "pred", terms = c("Age","Treatment"), grid = TRUE)
+
+#png(filename="/Users/ming-minyang/Desktop/Poli-psch/Survey/WJX2/plot_model11.png")
+#plot(plot_model11)
+#dev.off()
+```
+
+```{r, results='asis'}
+stargazer::stargazer(model1, model2, model3, type = 'latex', single.row=TRUE)
+stargazer::stargazer(model1, model2, model3, model4, model5, type = 'latex', single.row=TRUE)
+```
+
+# Entropy balancing
+Entropy balancing
+```{r}
+WJX3_entrophy2 <- readxl::read_xlsx("WJX3_entrophy2.xlsx")
+WJX3_entrophy2$...1 <- NULL
+treatment_en <- WJX3_entrophy2$Treatment_entropy
+WJX3_entrophy2$Treatment_entropy <- NULL #Remove the 'control (real data)' and 'treatment (real China's demography)'.
+treatment_assign <- WJX3_entrophy2$Treatment 
+WJX3_entrophy2$Treatment <- NULL 
+```
+
+```{r}
+library(ebal)
+eb.out <- ebalance(Treatment=treatment_en, X=WJX3_entrophy2)
+```
+
+```{r}
+#means in treatment group data 
+apply(WJX3_entrophy2[treatment_en==1,],2,mean)
+# means in reweighted control group data / 
+apply(WJX3_entrophy2[treatment_en==0,],2,weighted.mean,w=eb.out$w)
+# means in raw data control group data
+apply(WJX3_entrophy2[treatment_en==0,],2,mean)
+```
+
+Trim weights
+```{r}
+eb.out.tr <- ebalance.trim(eb.out)
+```
+
+```{r}
+# means in reweighted control group data
+apply(WJX3_entrophy2[treatment_en==0,],2,weighted.mean,w=eb.out.tr$w)
+apply(WJX3_entrophy2[treatment_en==1,],2,mean)
+
+# untrimmed and trimmed weights
+round(summary(eb.out$w),2)
+round(summary(eb.out.tr$w),2)
+```
+
+```{r}
+model6 <- glm(Boycott ~ Treatment  + Nationalism + Patriotism + Age + Education + Gender  + Race + Income + Party + Tour
+            , data=WJX3, family = "binomial")
+
+model7 <- glm(Boycott ~ Treatment  + Nationalism + Patriotism + Age + Education + Gender  + Race + Income + Party + Tour
+            , data=WJX3, weights=eb.out.tr$w, family = "binomial")
+```
+
+```{r, results='asis'}
+stargazer::stargazer(model6, model7, type = 'latex', single.row=TRUE)
+```
+
+
+
+
+
